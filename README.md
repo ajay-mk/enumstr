@@ -53,3 +53,17 @@ ctest --test-dir build
 
 Requires a C++20 compiler. CI exercises GCC 12/13/14 and Clang 16/17/18 on
 Ubuntu, plus MSVC on Windows.
+
+## Use as a dependency
+
+With `FetchContent`:
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(enumstr GIT_REPOSITORY <repo-url> GIT_TAG main)
+FetchContent_MakeAvailable(enumstr)
+target_link_libraries(your_target PRIVATE enumstr::enumstr)
+```
+
+Or after `cmake --install`, via `find_package(enumstr CONFIG REQUIRED)` and link
+`enumstr::enumstr`.
