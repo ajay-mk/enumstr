@@ -3,7 +3,7 @@
 ///
 /// Works on GCC and Clang by parsing `__PRETTY_FUNCTION__`. No macros, no code
 /// generation, and nothing to add to your enum definitions. Enumerators must
-/// lie within refl::enum_range (default `[0, 64)`); specialize it otherwise.
+/// lie within enumstr::enum_range (default `[0, 64)`); specialize it otherwise.
 #pragma once
 
 #include <optional>
@@ -11,7 +11,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace refl {
+namespace enumstr {
 
 /// @brief Constrains the public API to enumeration types.
 template <typename E>
@@ -23,7 +23,7 @@ concept Enum = std::is_enum_v<E>;
 /// default covers `[0, 64)`; specialize for enums with negative or large
 /// values:
 /// @code
-/// template <> struct refl::enum_range<Signal> {
+/// template <> struct enumstr::enum_range<Signal> {
 ///     static constexpr int min = -4;
 ///     static constexpr int max = 8;
 /// };
@@ -38,8 +38,8 @@ struct enum_range {
 /// @brief Extracts the unqualified spelling of a single enum value.
 ///
 /// Relies on the compiler embedding @p V in `__PRETTY_FUNCTION__`:
-///   - Clang: `std::string_view refl::raw_name() [V = Color::Red]`
-///   - GCC:   `constexpr std::string_view refl::raw_name() [with auto V = Color::Red]`
+///   - Clang: `std::string_view enumstr::raw_name() [V = Color::Red]`
+///   - GCC:   `constexpr std::string_view enumstr::raw_name() [with auto V = Color::Red]`
 ///
 /// The token after `"V = "` is sliced out and any `Type::` qualifier dropped,
 /// yielding e.g. `"Red"`. For an unnamed value the compiler emits a cast such
@@ -118,4 +118,4 @@ constexpr std::optional<E> from_string(std::string_view name) {
     return out;
 }
 
-} // namespace refl
+} // namespace enumstr
