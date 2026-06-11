@@ -1,5 +1,5 @@
-// Tests for enum_names.hpp — mix of compile-time (static_assert) and runtime checks.
-#include "enum_names.hpp"
+// Tests for enumstr.hpp — mix of compile-time (static_assert) and runtime checks.
+#include "enumstr.hpp"
 
 #include <cassert>
 #include <cstdio>

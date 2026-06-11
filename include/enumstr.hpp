@@ -1,4 +1,4 @@
-/// @file enum_names.hpp
+/// @file enumstr.hpp
 /// @brief Non-intrusive, dependency-free compile-time enum⇄string conversion.
 ///
 /// Works on GCC and Clang by parsing `__PRETTY_FUNCTION__`. No macros, no code
