@@ -1,8 +1,8 @@
 # enumstr
 
 Header-only, non-intrusive compile-time enum ⇄ string for C++20. No macros, no
-code generation, no dependencies — just include the header. Works on GCC and
-Clang by parsing `__PRETTY_FUNCTION__`.
+code generation, no dependencies — just include the header. Works on GCC,
+Clang, and MSVC by parsing the compiler's function-signature macro.
 
 ## Usage
 
@@ -51,4 +51,5 @@ cmake --build build
 ctest --test-dir build
 ```
 
-Requires a C++20 compiler. CI exercises GCC 12/13/14 and Clang 16/17/18 on Ubuntu.
+Requires a C++20 compiler. CI exercises GCC 12/13/14 and Clang 16/17/18 on
+Ubuntu, plus MSVC on Windows.

@@ -14,6 +14,10 @@ enable_testing()
 
 add_executable(test_enum_names tests/test_enum_names.cpp)
 target_link_libraries(test_enum_names PRIVATE enum_names)
-target_compile_options(test_enum_names PRIVATE -Wall -Wextra -Wpedantic -Werror)
+if(MSVC)
+    target_compile_options(test_enum_names PRIVATE /W4 /WX)
+else()
+    target_compile_options(test_enum_names PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
 
 add_test(NAME enum_names COMMAND test_enum_names)

@@ -1,7 +1,8 @@
 /// @file enumstr.hpp
 /// @brief Non-intrusive, dependency-free compile-time enum⇄string conversion.
 ///
-/// Works on GCC and Clang by parsing `__PRETTY_FUNCTION__`. No macros, no code
+/// Works on GCC, Clang, and MSVC by parsing the compiler's function-signature
+/// macro (`__PRETTY_FUNCTION__` / `__FUNCSIG__`). No macros, no code
 /// generation, and nothing to add to your enum definitions. Enumerators must
 /// lie within enumstr::enum_range (default `[0, 64)`); specialize it otherwise.
 #pragma once
@@ -37,20 +38,29 @@ struct enum_range {
 
 /// @brief Extracts the unqualified spelling of a single enum value.
 ///
-/// Relies on the compiler embedding @p V in `__PRETTY_FUNCTION__`:
+/// Relies on the compiler embedding @p V in its function-signature macro:
 ///   - Clang: `std::string_view enumstr::raw_name() [V = Color::Red]`
 ///   - GCC:   `constexpr std::string_view enumstr::raw_name() [with auto V = Color::Red]`
+///   - MSVC:  `...__cdecl enumstr::raw_name<Color::Red>(void)`
 ///
-/// The token after `"V = "` is sliced out and any `Type::` qualifier dropped,
-/// yielding e.g. `"Red"`. For an unnamed value the compiler emits a cast such
-/// as `"(Color)42"` instead; see valid().
+/// The embedded value is sliced out and any `Type::` qualifier dropped, yielding
+/// e.g. `"Red"`. For an unnamed value the compiler emits a cast such as
+/// `"(Color)42"` (GCC/Clang) or `"(enum Color)0x2a"` (MSVC) instead; see valid().
 /// @tparam V The enum value, passed as a non-type template parameter.
 /// @return The enumerator's identifier, or a cast expression for unnamed values.
 template <auto V>
 constexpr std::string_view raw_name() {
+#if defined(__clang__) || defined(__GNUC__)
     std::string_view s = __PRETTY_FUNCTION__;
     s.remove_prefix(s.find("V = ") + 4);
     s = s.substr(0, s.find_first_of(";]"));
+#elif defined(_MSC_VER)
+    std::string_view s = __FUNCSIG__;
+    s.remove_prefix(s.find("raw_name<") + 9);
+    s = s.substr(0, s.rfind(">("));
+#else
+#  error "enumstr: unsupported compiler (need GCC, Clang, or MSVC)"
+#endif
     if (auto pos = s.rfind("::"); pos != std::string_view::npos)
         s.remove_prefix(pos + 2);
     return s;

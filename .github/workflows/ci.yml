@@ -38,3 +38,18 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+  msvc:
+    name: msvc
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
