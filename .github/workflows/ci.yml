@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: ${{ matrix.cxx }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { cc: gcc-12,   cxx: g++-12,     pkg: g++-12 }
+          - { cc: gcc-13,   cxx: g++-13,     pkg: g++-13 }
+          - { cc: gcc-14,   cxx: g++-14,     pkg: g++-14 }
+          - { cc: clang-16, cxx: clang++-16, pkg: clang-16 }
+          - { cc: clang-17, cxx: clang++-17, pkg: clang-17 }
+          - { cc: clang-18, cxx: clang++-18, pkg: clang-18 }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ${{ matrix.pkg }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.pkg }}
+
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DCMAKE_C_COMPILER=${{ matrix.cc }}
+          -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
