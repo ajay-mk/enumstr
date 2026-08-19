@@ -43,6 +43,19 @@ struct enumstr::enum_range<Signal> {
 enumstr::to_string(Signal::Lo);            // -> "Lo"
 ```
 
+## Limitations
+
+Bitmask enums are not supported. `to_string` matches a value against declared
+enumerators one at a time, so `to_string(Flags::A | Flags::B)` is `"<unknown>"`
+unless the combination is itself an enumerator.
+
+Cost scales with the width of the scan window, not with the number of
+enumerators. Every value in `[min, max)` instantiates a template, which is
+roughly 0.2s of compile time per enum per translation unit at the default width
+of 64. Widening `enum_range` to cover one distant enumerator makes you pay for
+every value in between, so prefer moving the enumerator to keeping the window
+wide. Windows over 4096 values are rejected.
+
 ## Build & test
 
 ```sh
