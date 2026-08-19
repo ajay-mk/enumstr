@@ -20,6 +20,8 @@ struct Widget { enum class Mode { On, Off }; };
 
 // A genuinely unscoped enum has no fixed underlying type, so its value range is
 // only as wide as its enumerators need -- narrower than the [0,64) scan window.
+// Not tested with an undeclared value: casting one in yields an unspecified
+// value, so there is no defined result to assert.
 enum Legacy { LA, LB };
 
 // Enum with values outside the default [0,64) window -> needs custom range.
@@ -69,7 +71,6 @@ static_assert(enumstr::from_string<Signal>("Lo"sv) == Signal::Lo);
 // --- Runtime checks ---------------------------------------------------------
 
 static int failures = 0;
-static volatile int unknown_legacy = 7;  // opaque: keeps the cast below non-constant
 
 #define CHECK(expr)                                                            \
     do {                                                                       \
@@ -99,10 +100,7 @@ int main() {
     CHECK(enumstr::from_string<app::Color>(enumstr::to_string(app::Color::Blue)) == app::Color::Blue);
     CHECK(enumstr::to_string(static_cast<app::Color>(42)) == "<unknown>"sv);
 
-    // Unscoped enum, including a value it never declared. The cast is deliberately
-    // kept out of a constant expression: out-of-range is unspecified, not constant.
     CHECK(enumstr::to_string(LB) == "LB"sv);
-    CHECK(enumstr::to_string(static_cast<Legacy>(unknown_legacy)) == "<unknown>"sv);
 
     // Empty string never matches.
     CHECK(enumstr::from_string<Color>(""sv) == std::nullopt);

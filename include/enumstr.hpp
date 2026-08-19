@@ -19,6 +19,7 @@
 // expressions, which valid() rejects anyway.
 #if defined(__clang__)
 #  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wunknown-warning-option"  // Clang < 12
 #  pragma clang diagnostic ignored "-Wenum-constexpr-conversion"
 #endif
 
