@@ -13,6 +13,11 @@ enum class Color { Red, Green, Blue };           // contiguous from 0
 enum class Sparse { A = 0, B = 5, C = 63 };      // gaps, still inside [0,64)
 enum class Plain { X, Y, Z };                    // unscoped-style name, scoped enum
 
+// Enums that are not at global scope: the compiler spells unnamed values as
+// "(app::Color)42", so stripping the qualifier must not leave "Color)42".
+namespace app { enum class Color { Red, Green, Blue }; }
+struct Widget { enum class Mode { On, Off }; };
+
 // Enum with values outside the default [0,64) window -> needs custom range.
 enum class Signal { Lo = -2, Mid = 0, Hi = 7 };
 
@@ -39,6 +44,13 @@ static_assert(enumstr::to_string(static_cast<Color>(42)) == "<unknown>"sv);
 static_assert(enumstr::from_string<Color>("Green"sv) == Color::Green);
 static_assert(enumstr::from_string<Sparse>("C"sv) == Sparse::C);
 static_assert(enumstr::from_string<Color>("Nope"sv) == std::nullopt);
+
+// Qualified scopes: names still come back unqualified, unnamed values are unknown.
+static_assert(enumstr::to_string(app::Color::Green) == "Green"sv);
+static_assert(enumstr::to_string(static_cast<app::Color>(42)) == "<unknown>"sv);
+static_assert(enumstr::to_string(Widget::Mode::Off) == "Off"sv);
+static_assert(enumstr::to_string(static_cast<Widget::Mode>(9)) == "<unknown>"sv);
+static_assert(enumstr::from_string<app::Color>("Color)42"sv) == std::nullopt);
 
 // Custom range covering negative enumerators.
 static_assert(enumstr::to_string(Signal::Lo) == "Lo"sv);
@@ -74,6 +86,9 @@ int main() {
     // Unknown handling.
     CHECK(enumstr::to_string(static_cast<Sparse>(3)) == "<unknown>"sv);
     CHECK(enumstr::from_string<Color>("Magenta"sv) == std::nullopt);
+
+    CHECK(enumstr::from_string<app::Color>(enumstr::to_string(app::Color::Blue)) == app::Color::Blue);
+    CHECK(enumstr::to_string(static_cast<app::Color>(42)) == "<unknown>"sv);
 
     // Empty string never matches.
     CHECK(enumstr::from_string<Color>(""sv) == std::nullopt);

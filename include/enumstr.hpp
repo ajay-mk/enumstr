@@ -69,15 +69,22 @@ constexpr std::string_view raw_name() {
 /// @brief Tests whether @p V corresponds to a declared enumerator.
 ///
 /// A declared enumerator's raw_name() is an identifier; an unnamed value yields
-/// a cast like `"(Color)42"` that starts with `'('`. The check is therefore
-/// simply "does the name begin with an identifier-start character".
+/// a cast expression instead. The whole string must be checked, not just its
+/// first character: for an enum outside global scope the cast is spelled
+/// `"(app::Color)42"`, and dropping the qualifier leaves `"Color)42"`, which
+/// starts with an identifier character but is not one.
 /// @tparam V The enum value to test.
 /// @return `true` if @p V names a real enumerator, `false` otherwise.
 template <auto V>
 constexpr bool valid() {
     constexpr std::string_view n = raw_name<V>();
-    constexpr char c = n.empty() ? '\0' : n.front();
-    return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    if (n.empty() || (n.front() >= '0' && n.front() <= '9'))
+        return false;
+    for (char c : n)
+        if (!(c == '_' || (c >= '0' && c <= '9') ||
+              (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')))
+            return false;
+    return true;
 }
 
 /// @brief Invokes @p f once per integer in `enum_range<E>`'s window.
