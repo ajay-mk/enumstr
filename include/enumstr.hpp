@@ -76,6 +76,17 @@ constexpr std::string_view raw_name() {
     return s;
 }
 
+/// @brief raw_name<V>() as a constant-initialized variable.
+///
+/// raw_name() is called from ordinary runtime code in to_string() and
+/// from_string(), where nothing forces constant evaluation -- an unoptimized
+/// build really does re-parse __PRETTY_FUNCTION__ on every call, once per value
+/// in the scan window. Binding the result to a variable template evaluates it at
+/// compile time regardless of optimization level.
+/// @tparam V The enum value to name.
+template <auto V>
+inline constexpr std::string_view name_v = raw_name<V>();
+
 /// @brief Tests whether @p V corresponds to a declared enumerator.
 ///
 /// A declared enumerator's raw_name() is an identifier; an unnamed value yields
@@ -87,7 +98,7 @@ constexpr std::string_view raw_name() {
 /// @return `true` if @p V names a real enumerator, `false` otherwise.
 template <auto V>
 constexpr bool valid() {
-    constexpr std::string_view n = raw_name<V>();
+    constexpr std::string_view n = name_v<V>;
     if (n.empty() || (n.front() >= '0' && n.front() <= '9'))
         return false;
     for (char c : n)
@@ -124,7 +135,7 @@ constexpr std::string_view to_string(E value) {
     for_each_value<E>([&](auto ic) {
         constexpr E e = static_cast<E>(ic.value);
         if (valid<e>() && e == value)
-            out = raw_name<e>();
+            out = name_v<e>;
     });
     return out;
 }
@@ -139,7 +150,7 @@ constexpr std::optional<E> from_string(std::string_view name) {
     std::optional<E> out;
     for_each_value<E>([&](auto ic) {
         constexpr E e = static_cast<E>(ic.value);
-        if (valid<e>() && raw_name<e>() == name)
+        if (valid<e>() && name_v<e> == name)
             out = e;
     });
     return out;
