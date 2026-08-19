@@ -12,6 +12,16 @@
 #include <type_traits>
 #include <utility>
 
+// The scan casts every integer in the window to E. An unscoped enum with no
+// fixed underlying type has a value range only as wide as its enumerators need,
+// so most of those casts are out of range -- unspecified since C++17, but an
+// error by default under Clang 16+. The names they produce are cast
+// expressions, which valid() rejects anyway.
+#if defined(__clang__)
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wenum-constexpr-conversion"
+#endif
+
 namespace enumstr {
 
 /// @brief Constrains the public API to enumeration types.
@@ -136,3 +146,7 @@ constexpr std::optional<E> from_string(std::string_view name) {
 }
 
 } // namespace enumstr
+
+#if defined(__clang__)
+#  pragma clang diagnostic pop
+#endif

@@ -18,6 +18,10 @@ enum class Plain { X, Y, Z };                    // unscoped-style name, scoped 
 namespace app { enum class Color { Red, Green, Blue }; }
 struct Widget { enum class Mode { On, Off }; };
 
+// A genuinely unscoped enum has no fixed underlying type, so its value range is
+// only as wide as its enumerators need -- narrower than the [0,64) scan window.
+enum Legacy { LA, LB };
+
 // Enum with values outside the default [0,64) window -> needs custom range.
 enum class Signal { Lo = -2, Mid = 0, Hi = 7 };
 
@@ -52,6 +56,10 @@ static_assert(enumstr::to_string(Widget::Mode::Off) == "Off"sv);
 static_assert(enumstr::to_string(static_cast<Widget::Mode>(9)) == "<unknown>"sv);
 static_assert(enumstr::from_string<app::Color>("Color)42"sv) == std::nullopt);
 
+// Unscoped enum: scanning it must compile, and names come back unqualified.
+static_assert(enumstr::to_string(LA) == "LA"sv);
+static_assert(enumstr::from_string<Legacy>("LB"sv) == LB);
+
 // Custom range covering negative enumerators.
 static_assert(enumstr::to_string(Signal::Lo) == "Lo"sv);
 static_assert(enumstr::to_string(Signal::Mid) == "Mid"sv);
@@ -61,6 +69,7 @@ static_assert(enumstr::from_string<Signal>("Lo"sv) == Signal::Lo);
 // --- Runtime checks ---------------------------------------------------------
 
 static int failures = 0;
+static volatile int unknown_legacy = 7;  // opaque: keeps the cast below non-constant
 
 #define CHECK(expr)                                                            \
     do {                                                                       \
@@ -89,6 +98,11 @@ int main() {
 
     CHECK(enumstr::from_string<app::Color>(enumstr::to_string(app::Color::Blue)) == app::Color::Blue);
     CHECK(enumstr::to_string(static_cast<app::Color>(42)) == "<unknown>"sv);
+
+    // Unscoped enum, including a value it never declared. The cast is deliberately
+    // kept out of a constant expression: out-of-range is unspecified, not constant.
+    CHECK(enumstr::to_string(LB) == "LB"sv);
+    CHECK(enumstr::to_string(static_cast<Legacy>(unknown_legacy)) == "<unknown>"sv);
 
     // Empty string never matches.
     CHECK(enumstr::from_string<Color>(""sv) == std::nullopt);
