@@ -18,6 +18,16 @@ enum class Plain { X, Y, Z };                    // unscoped-style name, scoped 
 namespace app { enum class Color { Red, Green, Blue }; }
 struct Widget { enum class Mode { On, Off }; };
 
+// Deeper and stranger scopes. Only the last "::" matters, so nesting depth is
+// irrelevant, but a class template's argument can itself contain "::".
+namespace deep { namespace detail { namespace colors { enum class C { Red, Blue }; } } }
+namespace { enum class Anon { Hidden }; }
+template <typename T> struct Wrap { enum class E { Inner }; };
+struct Outer { struct Inner { enum class Deep { Nested }; }; };
+
+// Identifiers that brush up against the character test in valid().
+enum class Awkward { _leading, x__y, trailing_ };
+
 // A genuinely unscoped enum has no fixed underlying type, so its value range is
 // only as wide as its enumerators need -- narrower than the [0,64) scan window.
 // Not tested with an undeclared value: casting one in yields an unspecified
@@ -57,6 +67,21 @@ static_assert(enumstr::to_string(static_cast<app::Color>(42)) == "<unknown>"sv);
 static_assert(enumstr::to_string(Widget::Mode::Off) == "Off"sv);
 static_assert(enumstr::to_string(static_cast<Widget::Mode>(9)) == "<unknown>"sv);
 static_assert(enumstr::from_string<app::Color>("Color)42"sv) == std::nullopt);
+
+// Deep nesting still yields the unqualified name, and still rejects non-names.
+static_assert(enumstr::to_string(deep::detail::colors::C::Blue) == "Blue"sv);
+static_assert(enumstr::to_string(static_cast<deep::detail::colors::C>(42)) == "<unknown>"sv);
+static_assert(enumstr::to_string(Anon::Hidden) == "Hidden"sv);
+static_assert(enumstr::to_string(static_cast<Anon>(42)) == "<unknown>"sv);
+static_assert(enumstr::to_string(Wrap<Color>::E::Inner) == "Inner"sv);
+static_assert(enumstr::to_string(static_cast<Wrap<Color>::E>(42)) == "<unknown>"sv);
+static_assert(enumstr::to_string(Outer::Inner::Deep::Nested) == "Nested"sv);
+static_assert(enumstr::to_string(static_cast<Outer::Inner::Deep>(42)) == "<unknown>"sv);
+static_assert(enumstr::from_string<deep::detail::colors::C>("Blue"sv) == deep::detail::colors::C::Blue);
+
+static_assert(enumstr::to_string(Awkward::_leading) == "_leading"sv);
+static_assert(enumstr::to_string(Awkward::x__y) == "x__y"sv);
+static_assert(enumstr::to_string(Awkward::trailing_) == "trailing_"sv);
 
 // Unscoped enum: scanning it must compile, and names come back unqualified.
 static_assert(enumstr::to_string(LA) == "LA"sv);

@@ -29,6 +29,11 @@ if(PROJECT_IS_TOP_LEVEL)
     endif()
 
     add_test(NAME enum_names COMMAND test_enum_names)
+
+    # Built so it cannot rot, but not registered with ctest: timings in CI are
+    # noise. Run it by hand, at -O2, on an idle machine.
+    add_executable(bench tests/bench.cpp)
+    target_link_libraries(bench PRIVATE enumstr::enumstr)
 endif()
 
 include(CMakePackageConfigHelpers)

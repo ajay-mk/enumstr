@@ -39,6 +39,26 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+  sanitizers:
+    name: ${{ matrix.san }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        san: [undefined, address]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_CXX_FLAGS="-fsanitize=${{ matrix.san }} -fno-omit-frame-pointer"
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        env:
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build --output-on-failure
+
   macos:
     name: appleclang
     runs-on: macos-latest
