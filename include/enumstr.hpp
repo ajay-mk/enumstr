@@ -46,6 +46,9 @@ struct enum_range {
     static constexpr int max = 64;  ///< One past the last value probed (exclusive).
 };
 
+/// @brief Implementation detail; not part of the public API.
+namespace detail {
+
 /// @brief Extracts the unqualified spelling of a single enum value.
 ///
 /// Relies on the compiler embedding @p V in its function-signature macro:
@@ -55,7 +58,7 @@ struct enum_range {
 ///
 /// The embedded value is sliced out and any `Type::` qualifier dropped, yielding
 /// e.g. `"Red"`. For an unnamed value the compiler emits a cast such as
-/// `"(Color)42"` (GCC/Clang) or `"(enum Color)0x2a"` (MSVC) instead; see valid().
+/// `"(Color)42"` (GCC/Clang) or `"(enum Color)0x2a"` (MSVC) instead; see detail::valid().
 /// @tparam V The enum value, passed as a non-type template parameter.
 /// @return The enumerator's identifier, or a cast expression for unnamed values.
 template <auto V>
@@ -137,6 +140,8 @@ constexpr void for_each_value(F f) {
     }(std::make_integer_sequence<int, hi - lo>{});
 }
 
+} // namespace detail
+
 /// @brief Converts an enum value to its enumerator name.
 /// @tparam E Enumeration type (deduced from @p value).
 /// @param value The value to name.
@@ -145,10 +150,10 @@ constexpr void for_each_value(F f) {
 template <Enum E>
 constexpr std::string_view to_string(E value) {
     std::string_view out = "<unknown>";
-    for_each_value<E>([&](auto ic) {
+    detail::for_each_value<E>([&](auto ic) {
         constexpr E e = static_cast<E>(ic.value);
-        if (valid<e>() && e == value)
-            out = name_v<e>;
+        if (detail::valid<e>() && e == value)
+            out = detail::name_v<e>;
     });
     return out;
 }
@@ -161,9 +166,9 @@ constexpr std::string_view to_string(E value) {
 template <Enum E>
 constexpr std::optional<E> from_string(std::string_view name) {
     std::optional<E> out;
-    for_each_value<E>([&](auto ic) {
+    detail::for_each_value<E>([&](auto ic) {
         constexpr E e = static_cast<E>(ic.value);
-        if (valid<e>() && name_v<e> == name)
+        if (detail::valid<e>() && detail::name_v<e> == name)
             out = e;
     });
     return out;
