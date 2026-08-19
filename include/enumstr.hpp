@@ -139,9 +139,14 @@ constexpr bool valid() {
 /// implementation's storage choice, which is far wider.
 /// @tparam E The enumeration type.
 /// @tparam N The integer to test.
+///
+/// @tparam V Any value; the template exists only to be named, never instantiated
+///           into storage, so naming it cannot itself load an out-of-range enum.
+template <auto V>
+struct probe {};
+
 template <typename E, int N>
-concept representable =
-    requires { typename std::integral_constant<E, static_cast<E>(N)>::type; };
+concept representable = requires { typename probe<static_cast<E>(N)>; };
 
 /// @brief Invokes @p f once per representable integer in `enum_range<E>`'s window.
 ///
