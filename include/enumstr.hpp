@@ -61,12 +61,20 @@ struct enum_range {
 template <auto V>
 constexpr std::string_view raw_name() {
 #if defined(__clang__) || defined(__GNUC__)
-    std::string_view s = __PRETTY_FUNCTION__;
-    s.remove_prefix(s.find("V = ") + 4);
+    constexpr std::string_view sig = __PRETTY_FUNCTION__;
+    constexpr auto begin = sig.find("V = ");
+    static_assert(begin != std::string_view::npos,
+                  "enumstr: __PRETTY_FUNCTION__ is not in the expected format; "
+                  "this compiler version needs a new parse case");
+    std::string_view s = sig.substr(begin + 4);
     s = s.substr(0, s.find_first_of(";]"));
 #elif defined(_MSC_VER)
-    std::string_view s = __FUNCSIG__;
-    s.remove_prefix(s.find("raw_name<") + 9);
+    constexpr std::string_view sig = __FUNCSIG__;
+    constexpr auto begin = sig.find("raw_name<");
+    static_assert(begin != std::string_view::npos,
+                  "enumstr: __FUNCSIG__ is not in the expected format; "
+                  "this compiler version needs a new parse case");
+    std::string_view s = sig.substr(begin + 9);
     s = s.substr(0, s.rfind(">("));
 #else
 #  error "enumstr: unsupported compiler (need GCC, Clang, or MSVC)"
@@ -119,6 +127,11 @@ constexpr bool valid() {
 template <Enum E, typename F>
 constexpr void for_each_value(F f) {
     constexpr int lo = enum_range<E>::min, hi = enum_range<E>::max;
+    static_assert(lo < hi, "enumstr: enum_range<E>::max must be greater than ::min");
+    static_assert(static_cast<long long>(hi) - lo <= 4096,
+                  "enumstr: enum_range<E> window exceeds 4096 values; the scan "
+                  "instantiates one template per value, so this would be very "
+                  "slow to compile");
     [&]<int... Is>(std::integer_sequence<int, Is...>) {
         (f(std::integral_constant<int, lo + Is>{}), ...);
     }(std::make_integer_sequence<int, hi - lo>{});
