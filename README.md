@@ -43,6 +43,29 @@ struct enumstr::enum_range<Signal> {
 enumstr::to_string(Signal::Lo);            // -> "Lo"
 ```
 
+## Performance
+
+Names are resolved at compile time; a call is a scan over the window comparing
+against constants. `tests/bench.cpp` measures it, with every input passed
+through a `volatile` so the compiler cannot fold a call down to its answer:
+
+```
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build && ./build/bench
+```
+
+Apple Clang 17, M-series, `-O2`, 1M iterations per case:
+
+| case | ns/call |
+|---|---|
+| `to_string`, hit early in the window | 0.6 |
+| `to_string`, hit late in the window | 1.0 |
+| `to_string`, miss | 0.3 |
+| `from_string`, hit | 1.6 |
+| `from_string`, miss | 2.0 |
+
+Unoptimized builds are roughly 100x slower, since the scan is a real loop there.
+Re-measure on your own hardware before quoting these.
+
 ## Limitations
 
 Bitmask enums are not supported. `to_string` matches a value against declared
