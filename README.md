@@ -73,11 +73,12 @@ enumerators one at a time, so `to_string(Flags::A | Flags::B)` is `"<unknown>"`
 unless the combination is itself an enumerator.
 
 Unscoped enums declared without a fixed underlying type (`enum Legacy { LA, LB };`)
-have a value range only as wide as their enumerators need. Handing `to_string` a
-value outside that range is unspecified before it ever reaches enumstr, and
-UBSan's `-fsanitize=enum` reports the load from inside the header. Give such an
-enum an explicit underlying type (`enum Legacy : int { LA, LB };`) if you need
-to name values it never declared.
+have a value range only as wide as their enumerators need. Naming their
+enumerators works, but handing `to_string` a value outside that range is
+unspecified before it ever reaches enumstr, and UBSan's `-fsanitize=enum`
+reports the load from inside the header. Give such an enum an explicit
+underlying type (`enum Legacy : int { LA, LB };`) if you need to name values it
+never declared.
 
 Cost scales with the width of the scan window, not with the number of
 enumerators. Every value in `[min, max)` instantiates a template, which is

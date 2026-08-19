@@ -12,11 +12,17 @@
 #include <type_traits>
 #include <utility>
 
-// The scan casts every integer in the window to E. An unscoped enum with no
-// fixed underlying type has a value range only as wide as its enumerators need,
-// so most of those casts are out of range -- unspecified since C++17, but an
-// error by default under Clang 16+. The names they produce are cast
-// expressions, which valid() rejects anyway.
+// Scanning an unscoped enum declared without a fixed underlying type casts
+// integers it cannot represent. Two compiler eras, two mechanisms:
+//
+//   Clang 21+ treats such a cast as a hard error, since the result is not a
+//   constant expression. detail::representable detects that by substitution and
+//   skips those values, so the cast is never made.
+//
+//   Clang 12 through 20 treat it as a warning instead. Substitution therefore
+//   succeeds, representable is always true, and the casts do happen -- this
+//   pragma is what keeps them quiet. The names they produce are cast
+//   expressions, which detail::valid() rejects.
 #if defined(__clang__)
 #  pragma clang diagnostic push
 #  pragma clang diagnostic ignored "-Wunknown-warning-option"  // Clang < 12
@@ -120,14 +126,32 @@ constexpr bool valid() {
     return true;
 }
 
-/// @brief Invokes @p f once per integer in `enum_range<E>`'s window.
+/// @brief Whether `static_cast<E>(N)` is a usable constant expression.
+///
+/// An unscoped enum declared without a fixed underlying type has a value range
+/// only as wide as its enumerators need -- `enum Legacy { LA, LB };` covers
+/// `[0, 1]`, not the whole scan window. Casting an integer outside that range
+/// yields an unspecified value, so it is not a constant expression and cannot be
+/// used as a template argument. Clang 21 and later report that as a hard error.
+///
+/// Substitution failure is the only portable way to ask, since nothing in
+/// <type_traits> exposes an enum's range: std::underlying_type_t is the
+/// implementation's storage choice, which is far wider.
+/// @tparam E The enumeration type.
+/// @tparam N The integer to test.
+template <typename E, int N>
+concept representable =
+    requires { typename std::integral_constant<E, static_cast<E>(N)>::type; };
+
+/// @brief Invokes @p f once per representable integer in `enum_range<E>`'s window.
 ///
 /// Each call passes `std::integral_constant<int, N>` rather than a plain `int`,
 /// so @p N stays a constant expression usable as a template argument (e.g.
 /// `static_cast<E>(ic.value)` followed by `valid<...>()`) inside @p f.
 /// @tparam E The enum whose range bounds the iteration.
 /// @tparam F Callable accepting `std::integral_constant<int, N>`.
-/// @param f Invoked for every value in `[enum_range<E>::min, enum_range<E>::max)`.
+/// @param f Invoked for every value in `[enum_range<E>::min, enum_range<E>::max)`
+///          that E can actually represent; the rest are skipped silently.
 template <Enum E, typename F>
 constexpr void for_each_value(F f) {
     constexpr int lo = enum_range<E>::min, hi = enum_range<E>::max;
@@ -137,7 +161,10 @@ constexpr void for_each_value(F f) {
                   "instantiates one template per value, so this would be very "
                   "slow to compile");
     [&]<int... Is>(std::integer_sequence<int, Is...>) {
-        (f(std::integral_constant<int, lo + Is>{}), ...);
+        ([&] {
+            if constexpr (representable<E, lo + Is>)
+                f(std::integral_constant<int, lo + Is>{});
+        }(), ...);
     }(std::make_integer_sequence<int, hi - lo>{});
 }
 
