@@ -39,6 +39,86 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+  clang21:
+    name: clang-21
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "21.1.8"
+          env: true
+      - name: Configure
+        run: cmake -S . -B build
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  sanitizers:
+    name: ${{ matrix.san }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        san: [undefined, address]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_CXX_FLAGS="-fsanitize=${{ matrix.san }} -fno-omit-frame-pointer"
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        env:
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build --output-on-failure
+
+  macos:
+    name: appleclang
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  install:
+    name: install + find_package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install to a prefix
+        run: |
+          cmake -S . -B build -DCMAKE_INSTALL_PREFIX="$PWD/prefix"
+          cmake --build build
+          cmake --install build
+
+      - name: Consume it from a separate project
+        run: |
+          mkdir consumer && cd consumer
+          cat > CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.20)
+          project(consumer LANGUAGES CXX)
+          find_package(enumstr 0.1 CONFIG REQUIRED)
+          add_executable(app app.cpp)
+          target_link_libraries(app PRIVATE enumstr::enumstr)
+          EOF
+          cat > app.cpp <<'EOF'
+          #include <enumstr.hpp>
+          #include <cassert>
+          namespace app { enum class Color { Red, Green, Blue }; }
+          int main() { assert(enumstr::to_string(app::Color::Blue) == "Blue"); }
+          EOF
+          cmake -S . -B build -DCMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/prefix"
+          cmake --build build
+          ./build/app
+
   msvc:
     name: msvc
     runs-on: windows-latest
