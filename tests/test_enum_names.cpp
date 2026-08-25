@@ -27,11 +27,12 @@ struct Outer { struct Inner { enum class Deep { Nested }; }; };
 
 // Identifiers that brush up against the character test in valid().
 enum class Awkward { _leading, x__y, trailing_ };
+enum class Unicode { café };
 
 // A genuinely unscoped enum has no fixed underlying type, so its value range is
 // only as wide as its enumerators need -- narrower than the [0,64) scan window.
-// Not tested with an undeclared value: casting one in yields an unspecified
-// value, so there is no defined result to assert.
+// Not tested with an undeclared value: casting one in has undefined behavior,
+// so there is no defined result to assert.
 enum Legacy { LA, LB };
 
 // Enum with values outside the default [0,64) window -> needs custom range.
@@ -82,6 +83,8 @@ static_assert(enumstr::from_string<deep::detail::colors::C>("Blue"sv) == deep::d
 static_assert(enumstr::to_string(Awkward::_leading) == "_leading"sv);
 static_assert(enumstr::to_string(Awkward::x__y) == "x__y"sv);
 static_assert(enumstr::to_string(Awkward::trailing_) == "trailing_"sv);
+static_assert(enumstr::to_string(Unicode::café) == "café"sv);
+static_assert(enumstr::from_string<Unicode>("café"sv) == Unicode::café);
 
 // Unscoped enum: scanning it must compile, and names come back unqualified.
 static_assert(enumstr::to_string(LA) == "LA"sv);

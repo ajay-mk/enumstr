@@ -53,18 +53,7 @@ through a `volatile` so the compiler cannot fold a call down to its answer:
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build && ./build/bench
 ```
 
-Apple Clang 17, M-series, `-O2`, 1M iterations per case:
-
-| case | ns/call |
-|---|---|
-| `to_string`, hit early in the window | 0.6 |
-| `to_string`, hit late in the window | 1.0 |
-| `to_string`, miss | 0.3 |
-| `from_string`, hit | 1.6 |
-| `from_string`, miss | 2.0 |
-
-Unoptimized builds are roughly 100x slower, since the scan is a real loop there.
-Re-measure on your own hardware before quoting these.
+Run the benchmark on the target compiler and hardware when performance matters.
 
 ## Limitations
 
@@ -75,17 +64,16 @@ unless the combination is itself an enumerator.
 Unscoped enums declared without a fixed underlying type (`enum Legacy { LA, LB };`)
 have a value range only as wide as their enumerators need. Naming their
 enumerators works, but handing `to_string` a value outside that range is
-unspecified before it ever reaches enumstr, and UBSan's `-fsanitize=enum`
+undefined behavior before it ever reaches enumstr, and UBSan's `-fsanitize=enum`
 reports the load from inside the header. Give such an enum an explicit
 underlying type (`enum Legacy : int { LA, LB };`) if you need to name values it
 never declared.
 
 Cost scales with the width of the scan window, not with the number of
-enumerators. Every value in `[min, max)` instantiates a template, which is
-roughly 0.2s of compile time per enum per translation unit at the default width
-of 64. Widening `enum_range` to cover one distant enumerator makes you pay for
-every value in between, so prefer moving the enumerator to keeping the window
-wide. Windows over 4096 values are rejected.
+enumerators. Every value in `[min, max)` instantiates a template. Widening
+`enum_range` to cover one distant enumerator makes you pay for every value in
+between, so prefer moving the enumerator to keeping the window wide. Windows
+over 4096 values are rejected.
 
 ## Build & test
 

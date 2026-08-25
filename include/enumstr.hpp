@@ -108,22 +108,16 @@ inline constexpr std::string_view name_v = raw_name<V>();
 /// @brief Tests whether @p V corresponds to a declared enumerator.
 ///
 /// A declared enumerator's raw_name() is an identifier; an unnamed value yields
-/// a cast expression instead. The whole string must be checked, not just its
-/// first character: for an enum outside global scope the cast is spelled
-/// `"(app::Color)42"`, and dropping the qualifier leaves `"Color)42"`, which
-/// starts with an identifier character but is not one.
+/// a parenthesized cast expression instead. For an enum outside global scope
+/// the cast is spelled `"(app::Color)42"`, and dropping the qualifier leaves
+/// `"Color)42"`; checking for cast punctuation rejects it without restricting
+/// valid identifiers to ASCII.
 /// @tparam V The enum value to test.
 /// @return `true` if @p V names a real enumerator, `false` otherwise.
 template <auto V>
 constexpr bool valid() {
     constexpr std::string_view n = name_v<V>;
-    if (n.empty() || (n.front() >= '0' && n.front() <= '9'))
-        return false;
-    for (char c : n)
-        if (!(c == '_' || (c >= '0' && c <= '9') ||
-              (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')))
-            return false;
-    return true;
+    return !n.empty() && n.find_first_of("()") == std::string_view::npos;
 }
 
 /// @brief Whether `static_cast<E>(N)` is a usable constant expression.
@@ -131,7 +125,7 @@ constexpr bool valid() {
 /// An unscoped enum declared without a fixed underlying type has a value range
 /// only as wide as its enumerators need -- `enum Legacy { LA, LB };` covers
 /// `[0, 1]`, not the whole scan window. Casting an integer outside that range
-/// yields an unspecified value, so it is not a constant expression and cannot be
+/// has undefined behavior, so it is not a constant expression and cannot be
 /// used as a template argument. Clang 21 and later report that as a hard error.
 ///
 /// Substitution failure is the only portable way to ask, since nothing in
@@ -148,7 +142,7 @@ struct probe {};
 template <typename E, int N>
 concept representable = requires { typename probe<static_cast<E>(N)>; };
 
-/// @brief Invokes @p f once per representable integer in `enum_range<E>`'s window.
+/// @brief Invokes @p f once per compiler-accepted value in the scan window.
 ///
 /// Each call passes `std::integral_constant<int, N>` rather than a plain `int`,
 /// so @p N stays a constant expression usable as a template argument (e.g.
@@ -156,21 +150,26 @@ concept representable = requires { typename probe<static_cast<E>(N)>; };
 /// @tparam E The enum whose range bounds the iteration.
 /// @tparam F Callable accepting `std::integral_constant<int, N>`.
 /// @param f Invoked for every value in `[enum_range<E>::min, enum_range<E>::max)`
-///          that E can actually represent; the rest are skipped silently.
+///          that the compiler accepts as a template argument. Clang 12 through
+///          20 also accept out-of-range values after warning; valid() rejects
+///          their cast-expression names.
 template <Enum E, typename F>
 constexpr void for_each_value(F f) {
     constexpr int lo = enum_range<E>::min, hi = enum_range<E>::max;
+    constexpr long long width = static_cast<long long>(hi) - lo;
     static_assert(lo < hi, "enumstr: enum_range<E>::max must be greater than ::min");
-    static_assert(static_cast<long long>(hi) - lo <= 4096,
+    static_assert(width <= 4096,
                   "enumstr: enum_range<E> window exceeds 4096 values; the scan "
                   "instantiates one template per value, so this would be very "
                   "slow to compile");
-    [&]<int... Is>(std::integer_sequence<int, Is...>) {
-        ([&] {
-            if constexpr (representable<E, lo + Is>)
-                f(std::integral_constant<int, lo + Is>{});
-        }(), ...);
-    }(std::make_integer_sequence<int, hi - lo>{});
+    if constexpr (lo < hi && width <= 4096) {
+        [&]<int... Is>(std::integer_sequence<int, Is...>) {
+            ([&] {
+                if constexpr (representable<E, lo + Is>)
+                    f(std::integral_constant<int, lo + Is>{});
+            }(), ...);
+        }(std::make_integer_sequence<int, static_cast<int>(width)>{});
+    }
 }
 
 } // namespace detail
