@@ -13,17 +13,19 @@ Drop [`include/enumstr.hpp`](include/enumstr.hpp) on your include path and go:
 
 enum class Color { Red, Green, Blue };
 
-enumstr::to_string(Color::Green);          // -> "Green"
-enumstr::to_string(static_cast<Color>(9)); // -> "<unknown>"
+enumstr::to_string(Color::Green);               // -> std::string{"Green"}
+enumstr::to_string_view(Color::Green);          // -> std::string_view{"Green"}
+enumstr::to_string_view(static_cast<Color>(9)); // -> "<unknown>"
 
 enumstr::from_string<Color>("Blue");       // -> std::optional{Color::Blue}
 enumstr::from_string<Color>("Magenta");    // -> std::nullopt
 ```
 
-Everything is `constexpr`, so it works at compile time too:
+`to_string_view` and `from_string` are `constexpr`, so they work at compile time
+too:
 
 ```cpp
-static_assert(enumstr::to_string(Color::Red) == "Red");
+static_assert(enumstr::to_string_view(Color::Red) == "Red");
 ```
 
 ### Values outside [0, 64)
@@ -40,7 +42,7 @@ struct enumstr::enum_range<Signal> {
     static constexpr int max = 8;
 };
 
-enumstr::to_string(Signal::Lo);            // -> "Lo"
+enumstr::to_string_view(Signal::Lo);       // -> "Lo"
 ```
 
 ## Performance
@@ -57,13 +59,13 @@ Run the benchmark on the target compiler and hardware when performance matters.
 
 ## Limitations
 
-Bitmask enums are not supported. `to_string` matches a value against declared
-enumerators one at a time, so `to_string(Flags::A | Flags::B)` is `"<unknown>"`
+Bitmask enums are not supported. `to_string_view` matches a value against declared
+enumerators one at a time, so `to_string_view(Flags::A | Flags::B)` is `"<unknown>"`
 unless the combination is itself an enumerator.
 
 Unscoped enums declared without a fixed underlying type (`enum Legacy { LA, LB };`)
 have a value range only as wide as their enumerators need. Naming their
-enumerators works, but handing `to_string` a value outside that range is
+enumerators works, but handing `to_string_view` a value outside that range is
 undefined behavior before it ever reaches enumstr, and UBSan's `-fsanitize=enum`
 reports the load from inside the header. Give such an enum an explicit
 underlying type (`enum Legacy : int { LA, LB };`) if you need to name values it

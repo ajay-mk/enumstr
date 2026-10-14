@@ -8,6 +8,7 @@
 #pragma once
 
 #include <optional>
+#include <string>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -37,7 +38,7 @@ concept Enum = std::is_enum_v<E>;
 
 /// @brief Inclusive-min / exclusive-max scan window for an enum's values.
 ///
-/// to_string() and from_string() probe every integer in `[min, max)`. The
+/// to_string_view() and from_string() probe every integer in `[min, max)`. The
 /// default covers `[0, 64)`; specialize for enums with negative or large
 /// values:
 /// @code
@@ -96,7 +97,7 @@ constexpr std::string_view raw_name() {
 
 /// @brief raw_name<V>() as a constant-initialized variable.
 ///
-/// raw_name() is called from ordinary runtime code in to_string() and
+/// raw_name() is called from ordinary runtime code in to_string_view() and
 /// from_string(), where nothing forces constant evaluation -- an unoptimized
 /// build really does re-parse __PRETTY_FUNCTION__ on every call, once per value
 /// in the scan window. Binding the result to a variable template evaluates it at
@@ -180,7 +181,7 @@ constexpr void for_each_value(F f) {
 /// @return The enumerator spelling (e.g. `"Red"`), or `"<unknown>"` if @p value
 ///         is not a declared enumerator within `enum_range<E>`.
 template <Enum E>
-constexpr std::string_view to_string(E value) {
+constexpr std::string_view to_string_view(E value) {
     std::string_view out = "<unknown>";
     detail::for_each_value<E>([&](auto ic) {
         constexpr E e = static_cast<E>(ic.value);
@@ -188,6 +189,18 @@ constexpr std::string_view to_string(E value) {
             out = detail::name_v<e>;
     });
     return out;
+}
+
+/// @brief Converts an enum value to its enumerator name as an owning string.
+/// @tparam E Enumeration type (deduced from @p value).
+/// @param value The value to name.
+/// @return The same name as to_string_view(), as a `std::string` that composes
+///         with `+`. Prefer to_string_view() where no copy is needed, and at
+///         compile time: Clang with libstdc++ cannot yet construct a
+///         std::string during constant evaluation.
+template <Enum E>
+std::string to_string(E value) {
+    return std::string(to_string_view(value));
 }
 
 /// @brief Converts an enumerator name back to its enum value.

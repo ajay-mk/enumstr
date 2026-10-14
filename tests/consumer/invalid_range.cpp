@@ -8,4 +8,4 @@ struct enumstr::enum_range<Bad> {
     static constexpr int max = 1;
 };
 
-static_assert(enumstr::to_string(Bad::Value) == "Value");
+static_assert(enumstr::to_string_view(Bad::Value) == "Value");
