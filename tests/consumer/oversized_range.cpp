@@ -8,4 +8,4 @@ struct enumstr::enum_range<Wide> {
     static constexpr int max = 4097;
 };
 
-static_assert(enumstr::to_string(Wide::Value) == "Value");
+static_assert(enumstr::to_string_view(Wide::Value) == "Value");

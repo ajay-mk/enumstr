@@ -1,4 +1,4 @@
-// Timing for to_string/from_string. Not a correctness test and not run by
+// Timing for to_string_view/from_string. Not a correctness test and not run by
 // ctest -- build it and run it by hand when changing how the scan works.
 //
 // Every input goes through a volatile, so the compiler cannot fold a call down
@@ -33,17 +33,17 @@ static void time_it(const char* label, F body) {
 int main() {
     std::printf("%d iterations each\n\n", kIters);
 
-    time_it("to_string, early hit", [](int i) {
+    time_it("to_string_view, early hit", [](int i) {
         opaque_index = i % 3;
-        return enumstr::to_string(static_cast<Color>(opaque_index)).size();
+        return enumstr::to_string_view(static_cast<Color>(opaque_index)).size();
     });
-    time_it("to_string, late hit", [](int i) {
+    time_it("to_string_view, late hit", [](int i) {
         opaque_index = (i % 2) ? 31 : 63;
-        return enumstr::to_string(static_cast<Sparse>(opaque_index)).size();
+        return enumstr::to_string_view(static_cast<Sparse>(opaque_index)).size();
     });
-    time_it("to_string, miss", [](int) {
+    time_it("to_string_view, miss", [](int) {
         opaque_index = 42;
-        return enumstr::to_string(static_cast<Color>(opaque_index)).size();
+        return enumstr::to_string_view(static_cast<Color>(opaque_index)).size();
     });
     time_it("from_string, hit", [](int) {
         return enumstr::from_string<Color>(opaque_name).has_value() ? 1u : 0u;

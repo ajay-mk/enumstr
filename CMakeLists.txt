@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(enumstr VERSION 0.1.0 LANGUAGES CXX)
+project(enumstr VERSION 0.2.0 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 
@@ -61,9 +61,10 @@ if(PROJECT_IS_TOP_LEVEL)
 endif()
 
 include(CMakePackageConfigHelpers)
+# 0.x minor versions are not compatible with one another.
 write_basic_package_version_file(
     ${CMAKE_CURRENT_BINARY_DIR}/enumstrConfigVersion.cmake
-    COMPATIBILITY SameMajorVersion
+    COMPATIBILITY SameMinorVersion
     ARCH_INDEPENDENT)
 
 install(TARGETS enumstr EXPORT enumstrTargets)
