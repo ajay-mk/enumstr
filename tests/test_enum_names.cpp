@@ -1,4 +1,4 @@
-// Tests for enumstr.hpp — mix of compile-time (static_assert) and runtime checks.
+// Tests for enumstr.hpp, with compile-time (static_assert) and runtime checks.
 #include "enumstr.hpp"
 
 #include <cassert>
@@ -18,24 +18,25 @@ enum class Plain { X, Y, Z };                    // unscoped-style name, scoped 
 namespace app { enum class Color { Red, Green, Blue }; }
 struct Widget { enum class Mode { On, Off }; };
 
-// Deeper and stranger scopes. Only the last "::" matters, so nesting depth is
-// irrelevant, but a class template's argument can itself contain "::".
+// Deeper and less common scopes. Only the last "::" matters, so nesting depth
+// has no effect, but a class template's argument can itself contain "::".
 namespace deep { namespace detail { namespace colors { enum class C { Red, Blue }; } } }
 namespace { enum class Anon { Hidden }; }
 template <typename T> struct Wrap { enum class E { Inner }; };
 struct Outer { struct Inner { enum class Deep { Nested }; }; };
 
-// Identifiers that brush up against the character test in valid().
+// Identifiers close to the edge of the character test in valid().
 enum class Awkward { _leading, x__y, trailing_ };
 enum class Unicode { café };
 
-// A genuinely unscoped enum has no fixed underlying type, so its value range is
-// only as wide as its enumerators need -- narrower than the [0,64) scan window.
-// Not tested with an undeclared value: casting one in has undefined behavior,
-// so there is no defined result to assert.
+// An unscoped enum with no fixed underlying type has a value range only as
+// wide as its enumerators need, which is narrower than the [0,64) scan window.
+// The tests do not pass it an undeclared value. Casting one in has undefined
+// behavior, so there is no defined result to assert.
 enum Legacy { LA, LB };
 
-// Enum with values outside the default [0,64) window -> needs custom range.
+// Enum with values outside the default [0,64) window, so it needs a custom
+// range.
 enum class Signal { Lo = -2, Mid = 0, Hi = 7 };
 
 template <>
@@ -54,10 +55,10 @@ static_assert(enumstr::to_string_view(Sparse::A) == "A"sv);
 static_assert(enumstr::to_string_view(Sparse::B) == "B"sv);
 static_assert(enumstr::to_string_view(Sparse::C) == "C"sv);
 
-// Value with no matching enumerator -> "<unknown>".
+// A value with no matching enumerator is "<unknown>".
 static_assert(enumstr::to_string_view(static_cast<Color>(42)) == "<unknown>"sv);
 
-// Round-trip: from_string(to_string_view(v)) == v.
+// from_string finds names and rejects unknown ones.
 static_assert(enumstr::from_string<Color>("Green"sv) == Color::Green);
 static_assert(enumstr::from_string<Sparse>("C"sv) == Sparse::C);
 static_assert(enumstr::from_string<Color>("Nope"sv) == std::nullopt);
@@ -116,7 +117,7 @@ int main() {
         CHECK(enumstr::to_string_view(v) == name);
     }
 
-    // Round-trip every enumerator.
+    // Round-trip one enumerator of each enum.
     CHECK(enumstr::from_string<Color>(enumstr::to_string_view(Color::Red)) == Color::Red);
     CHECK(enumstr::from_string<Sparse>(enumstr::to_string_view(Sparse::B)) == Sparse::B);
     CHECK(enumstr::from_string<Plain>(enumstr::to_string_view(Plain::Y)) == Plain::Y);
