@@ -20,7 +20,7 @@ jobs:
           - { cc: clang-18, cxx: clang++-18, pkg: clang-18 }
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install ${{ matrix.pkg }}
         run: |
@@ -43,7 +43,7 @@ jobs:
     name: clang-21
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: KyleMayes/install-llvm-action@v2
         with:
           version: "21.1.8"
@@ -63,7 +63,7 @@ jobs:
       matrix:
         san: [undefined, address]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
         run: >
           cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -79,7 +79,7 @@ jobs:
     name: appleclang
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
         run: cmake -S . -B build
       - name: Build
@@ -91,7 +91,7 @@ jobs:
     name: install + find_package
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install to a prefix
         run: |
@@ -123,7 +123,7 @@ jobs:
     name: msvc
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Configure
         run: cmake -S . -B build
