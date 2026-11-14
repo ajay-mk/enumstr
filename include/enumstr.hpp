@@ -1,10 +1,11 @@
 /// @file enumstr.hpp
-/// @brief Non-intrusive, dependency-free compile-time enum⇄string conversion.
+/// @brief Compile-time conversion between enum values and their names.
 ///
-/// Works on GCC, Clang, and MSVC by parsing the compiler's function-signature
-/// macro (`__PRETTY_FUNCTION__` / `__FUNCSIG__`). No macros, no code
-/// generation, and nothing to add to your enum definitions. Enumerators must
-/// lie within enumstr::enum_range (default `[0, 64)`); specialize it otherwise.
+/// enumstr parses the compiler's function-signature macro, which is
+/// `__PRETTY_FUNCTION__` on GCC and Clang or `__FUNCSIG__` on MSVC. It needs no
+/// macros, no code generation, and no changes to your enum definitions.
+/// Enumerators must lie within enumstr::enum_range, which defaults to
+/// `[0, 64)`. Specialize it for enumerators outside that window.
 #pragma once
 
 #include <optional>
@@ -14,16 +15,17 @@
 #include <utility>
 
 // Scanning an unscoped enum declared without a fixed underlying type casts
-// integers it cannot represent. Two compiler eras, two mechanisms:
+// integers it cannot represent. Clang handles such casts in two ways,
+// depending on its version.
 //
-//   Clang 21+ treats such a cast as a hard error, since the result is not a
-//   constant expression. detail::representable detects that by substitution and
-//   skips those values, so the cast is never made.
+//   Clang 21 and later treat such a cast as a hard error, since the result is
+//   not a constant expression. detail::representable detects that by
+//   substitution and skips those values, so the cast is never made.
 //
 //   Clang 12 through 20 treat it as a warning instead. Substitution therefore
-//   succeeds, representable is always true, and the casts do happen -- this
-//   pragma is what keeps them quiet. The names they produce are cast
-//   expressions, which detail::valid() rejects.
+//   succeeds, representable is always true, and the casts happen. This pragma
+//   silences their warnings. The names they produce are cast expressions,
+//   which detail::valid() rejects.
 #if defined(__clang__)
 #  pragma clang diagnostic push
 #  pragma clang diagnostic ignored "-Wunknown-warning-option"  // Clang < 12
@@ -36,10 +38,10 @@ namespace enumstr {
 template <typename E>
 concept Enum = std::is_enum_v<E>;
 
-/// @brief Inclusive-min / exclusive-max scan window for an enum's values.
+/// @brief Scan window for an enum's values. min is inclusive, max exclusive.
 ///
 /// to_string_view() and from_string() probe every integer in `[min, max)`. The
-/// default covers `[0, 64)`; specialize for enums with negative or large
+/// default covers `[0, 64)`. Specialize it for enums with negative or large
 /// values:
 /// @code
 /// template <> struct enumstr::enum_range<Signal> {
@@ -54,7 +56,7 @@ struct enum_range {
     static constexpr int max = 64;  ///< One past the last value probed (exclusive).
 };
 
-/// @brief Implementation detail; not part of the public API.
+/// @brief Implementation details, not part of the public API.
 namespace detail {
 
 /// @brief Extracts the unqualified spelling of a single enum value.
@@ -64,9 +66,10 @@ namespace detail {
 ///   - GCC:   `constexpr std::string_view enumstr::raw_name() [with auto V = Color::Red]`
 ///   - MSVC:  `...__cdecl enumstr::raw_name<Color::Red>(void)`
 ///
-/// The embedded value is sliced out and any `Type::` qualifier dropped, yielding
-/// e.g. `"Red"`. For an unnamed value the compiler emits a cast such as
-/// `"(Color)42"` (GCC/Clang) or `"(enum Color)0x2a"` (MSVC) instead; see detail::valid().
+/// raw_name() cuts out the embedded value and drops any `Type::` qualifier,
+/// which leaves a name such as `"Red"`. For an unnamed value, the compiler
+/// emits a cast instead, such as `"(Color)42"` on GCC and Clang or
+/// `"(enum Color)0x2a"` on MSVC. detail::valid() rejects these.
 /// @tparam V The enum value, passed as a non-type template parameter.
 /// @return The enumerator's identifier, or a cast expression for unnamed values.
 template <auto V>
@@ -98,21 +101,21 @@ constexpr std::string_view raw_name() {
 /// @brief raw_name<V>() as a constant-initialized variable.
 ///
 /// raw_name() is called from ordinary runtime code in to_string_view() and
-/// from_string(), where nothing forces constant evaluation -- an unoptimized
-/// build really does re-parse __PRETTY_FUNCTION__ on every call, once per value
-/// in the scan window. Binding the result to a variable template evaluates it at
-/// compile time regardless of optimization level.
+/// from_string(), where nothing forces constant evaluation. An unoptimized
+/// build re-parses __PRETTY_FUNCTION__ on every call, once per value in the
+/// scan window. A variable template forces evaluation at compile time at every
+/// optimization level.
 /// @tparam V The enum value to name.
 template <auto V>
 inline constexpr std::string_view name_v = raw_name<V>();
 
 /// @brief Tests whether @p V corresponds to a declared enumerator.
 ///
-/// A declared enumerator's raw_name() is an identifier; an unnamed value yields
-/// a parenthesized cast expression instead. For an enum outside global scope
-/// the cast is spelled `"(app::Color)42"`, and dropping the qualifier leaves
-/// `"Color)42"`; checking for cast punctuation rejects it without restricting
-/// valid identifiers to ASCII.
+/// The raw_name() of a declared enumerator is an identifier. For an unnamed
+/// value, it is a cast expression in parentheses. For an enum outside global
+/// scope, the compiler spells the cast `"(app::Color)42"`, and dropping the
+/// qualifier leaves `"Color)42"`. valid() rejects any name that contains a
+/// parenthesis, so it accepts identifiers that are not ASCII.
 /// @tparam V The enum value to test.
 /// @return `true` if @p V names a real enumerator, `false` otherwise.
 template <auto V>
@@ -121,39 +124,40 @@ constexpr bool valid() {
     return !n.empty() && n.find_first_of("()") == std::string_view::npos;
 }
 
-/// @brief Whether `static_cast<E>(N)` is a usable constant expression.
-///
-/// An unscoped enum declared without a fixed underlying type has a value range
-/// only as wide as its enumerators need -- `enum Legacy { LA, LB };` covers
-/// `[0, 1]`, not the whole scan window. Casting an integer outside that range
-/// has undefined behavior, so it is not a constant expression and cannot be
-/// used as a template argument. Clang 21 and later report that as a hard error.
-///
-/// Substitution failure is the only portable way to ask, since nothing in
-/// <type_traits> exposes an enum's range: std::underlying_type_t is the
-/// implementation's storage choice, which is far wider.
-/// @tparam E The enumeration type.
-/// @tparam N The integer to test.
-///
-/// @tparam V Any value; the template exists only to be named, never instantiated
-///           into storage, so naming it cannot itself load an out-of-range enum.
+/// @brief Names a value as a template argument, for detail::representable.
+/// @tparam V Any value. Code only names probe and never creates an object of
+///           it, so naming it cannot load an out-of-range enum.
 template <auto V>
 struct probe {};
 
+/// @brief Whether `static_cast<E>(N)` is a usable constant expression.
+///
+/// An unscoped enum declared without a fixed underlying type has a value range
+/// only as wide as its enumerators need. `enum Legacy { LA, LB };` covers
+/// `[0, 1]`, not the whole scan window. Casting an integer outside that range
+/// has undefined behavior, so the result is not a constant expression and
+/// cannot be a template argument. Clang 21 and later report the cast as a hard
+/// error.
+///
+/// Substitution failure is the only portable test, since nothing in
+/// <type_traits> exposes the range of an enum. std::underlying_type_t is the
+/// storage type the implementation chose, which is far wider.
+/// @tparam E The enumeration type.
+/// @tparam N The integer to test.
 template <typename E, int N>
 concept representable = requires { typename probe<static_cast<E>(N)>; };
 
 /// @brief Invokes @p f once per compiler-accepted value in the scan window.
 ///
 /// Each call passes `std::integral_constant<int, N>` rather than a plain `int`,
-/// so @p N stays a constant expression usable as a template argument (e.g.
-/// `static_cast<E>(ic.value)` followed by `valid<...>()`) inside @p f.
+/// so inside @p f, @p N stays a constant expression that can be a template
+/// argument, as in `valid<static_cast<E>(ic.value)>()`.
 /// @tparam E The enum whose range bounds the iteration.
 /// @tparam F Callable accepting `std::integral_constant<int, N>`.
 /// @param f Invoked for every value in `[enum_range<E>::min, enum_range<E>::max)`
 ///          that the compiler accepts as a template argument. Clang 12 through
-///          20 also accept out-of-range values after warning; valid() rejects
-///          their cast-expression names.
+///          20 also accept out-of-range values after a warning. valid()
+///          rejects their names, which are cast expressions.
 template <Enum E, typename F>
 constexpr void for_each_value(F f) {
     constexpr int lo = enum_range<E>::min, hi = enum_range<E>::max;
@@ -178,8 +182,8 @@ constexpr void for_each_value(F f) {
 /// @brief Converts an enum value to its enumerator name.
 /// @tparam E Enumeration type (deduced from @p value).
 /// @param value The value to name.
-/// @return The enumerator spelling (e.g. `"Red"`), or `"<unknown>"` if @p value
-///         is not a declared enumerator within `enum_range<E>`.
+/// @return The enumerator spelling, such as `"Red"`, or `"<unknown>"` if
+///         @p value is not a declared enumerator within `enum_range<E>`.
 template <Enum E>
 constexpr std::string_view to_string_view(E value) {
     std::string_view out = "<unknown>";
@@ -195,16 +199,17 @@ constexpr std::string_view to_string_view(E value) {
 /// @tparam E Enumeration type (deduced from @p value).
 /// @param value The value to name.
 /// @return The same name as to_string_view(), as a `std::string` that composes
-///         with `+`. Prefer to_string_view() where no copy is needed, and at
-///         compile time: Clang with libstdc++ cannot yet construct a
-///         std::string during constant evaluation.
+///         with `+`. Prefer to_string_view() where you need no copy. Also
+///         prefer it at compile time, because Clang with libstdc++ cannot yet
+///         construct a std::string during constant evaluation.
 template <Enum E>
 std::string to_string(E value) {
     return std::string(to_string_view(value));
 }
 
 /// @brief Converts an enumerator name back to its enum value.
-/// @tparam E Enumeration type; specify explicitly, e.g. `from_string<Color>("Red")`.
+/// @tparam E Enumeration type. Specify it explicitly, as in
+///           `from_string<Color>("Red")`.
 /// @param name The enumerator spelling to look up.
 /// @return The matching value, or `std::nullopt` if no enumerator in
 ///         `enum_range<E>` has that name.

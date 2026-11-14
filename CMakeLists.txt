@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Header-only library, consumed via target_link_libraries(... enumstr::enumstr).
+# Header-only library. Consumers link enumstr::enumstr.
 add_library(enumstr INTERFACE)
 add_library(enumstr::enumstr ALIAS enumstr)
 target_include_directories(enumstr INTERFACE
@@ -15,8 +15,8 @@ target_include_directories(enumstr INTERFACE
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_compile_features(enumstr INTERFACE cxx_std_20)
 
-# Tests are for developing enumstr, not for consuming it: skip them when this
-# is a FetchContent/add_subdirectory child of someone else's build.
+# Tests are for developing enumstr. Skip them when another project pulls
+# enumstr in with FetchContent or add_subdirectory.
 if(PROJECT_IS_TOP_LEVEL)
     enable_testing()
 
@@ -54,8 +54,9 @@ if(PROJECT_IS_TOP_LEVEL)
             RUN_SERIAL TRUE)
     endforeach()
 
-    # Built so it cannot rot, but not registered with ctest: timings in CI are
-    # noise. Run it by hand, at -O2, on an idle machine.
+    # Build the benchmark so it keeps compiling, but leave it out of ctest,
+    # because CI timings vary too much to compare. Run it by hand at -O2 on an
+    # idle machine.
     add_executable(bench tests/bench.cpp)
     target_link_libraries(bench PRIVATE enumstr::enumstr)
 endif()

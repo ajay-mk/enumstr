@@ -1,12 +1,13 @@
 # enumstr
 
-Header-only, non-intrusive compile-time enum ⇄ string for C++20. No macros, no
-code generation, no dependencies — just include the header. Works on GCC,
-Clang, and MSVC by parsing the compiler's function-signature macro.
+Header-only C++20 library that converts enum values to their names and names
+back to values at compile time, without changes to the enum. It needs no
+macros, no code generation, and no dependencies. It parses the
+function-signature macro of GCC, Clang, or MSVC.
 
 ## Usage
 
-Drop [`include/enumstr.hpp`](include/enumstr.hpp) on your include path and go:
+Add [`include/enumstr.hpp`](include/enumstr.hpp) to your include path:
 
 ```cpp
 #include "enumstr.hpp"
@@ -21,8 +22,8 @@ enumstr::from_string<Color>("Blue");       // -> std::optional{Color::Blue}
 enumstr::from_string<Color>("Magenta");    // -> std::nullopt
 ```
 
-`to_string_view` and `from_string` are `constexpr`, so they work at compile time
-too:
+`to_string_view` and `from_string` are `constexpr`, so they also work at compile
+time:
 
 ```cpp
 static_assert(enumstr::to_string_view(Color::Red) == "Red");
@@ -30,7 +31,7 @@ static_assert(enumstr::to_string_view(Color::Red) == "Red");
 
 ### Values outside [0, 64)
 
-By default only values in `[0, 64)` are scanned. For negative or large
+By default, enumstr scans only values in `[0, 64)`. For negative or large
 enumerators, specialize `enum_range`:
 
 ```cpp
@@ -47,37 +48,35 @@ enumstr::to_string_view(Signal::Lo);       // -> "Lo"
 
 ## Performance
 
-Names are resolved at compile time; a call is a scan over the window comparing
-against constants. `tests/bench.cpp` measures it, with every input passed
-through a `volatile` so the compiler cannot fold a call down to its answer:
+The compiler resolves names at compile time. At run time, a call compares its
+argument against a constant for each enumerator in the scan window.
+`tests/bench.cpp` measures this. It passes every input through a `volatile` so
+that the compiler cannot fold a call down to its answer:
 
 ```
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build && ./build/bench
 ```
 
-Run the benchmark on the target compiler and hardware when performance matters.
-
 ## Limitations
 
-Bitmask enums are not supported. `to_string_view` matches a value against declared
-enumerators one at a time, so `to_string_view(Flags::A | Flags::B)` is `"<unknown>"`
-unless the combination is itself an enumerator.
+enumstr does not support bitmask enums. `to_string_view` matches a value against
+declared enumerators one at a time, so `to_string_view(Flags::A | Flags::B)` is
+`"<unknown>"` unless the combination is itself an enumerator.
 
 Unscoped enums declared without a fixed underlying type (`enum Legacy { LA, LB };`)
-have a value range only as wide as their enumerators need. Naming their
-enumerators works, but handing `to_string_view` a value outside that range is
-undefined behavior before it ever reaches enumstr, and UBSan's `-fsanitize=enum`
-reports the load from inside the header. Give such an enum an explicit
-underlying type (`enum Legacy : int { LA, LB };`) if you need to name values it
-never declared.
+have a value range only as wide as their enumerators need. enumstr names their
+enumerators, but casting a value outside that range to the enum has undefined
+behavior, before enumstr sees it. UBSan's `-fsanitize=enum` reports the load
+from inside the header. To name values that such an enum does not declare, give
+it an explicit underlying type (`enum Legacy : int { LA, LB };`).
 
-Cost scales with the width of the scan window, not with the number of
-enumerators. Every value in `[min, max)` instantiates a template. Widening
-`enum_range` to cover one distant enumerator makes you pay for every value in
-between, so prefer moving the enumerator to keeping the window wide. Windows
-over 4096 values are rejected.
+Compile cost scales with the width of the scan window, not with the number of
+enumerators. Every value in `[min, max)` instantiates a template. If you widen
+`enum_range` to cover one distant enumerator, you pay for every value in
+between, so move the enumerator closer instead. enumstr rejects windows wider
+than 4096 values.
 
-## Build & test
+## Build and test
 
 ```sh
 cmake -S . -B build
@@ -85,8 +84,9 @@ cmake --build build
 ctest --test-dir build
 ```
 
-Requires a C++20 compiler. CI exercises GCC 12/13/14 and Clang 16/17/18 on
-Ubuntu, plus MSVC on Windows.
+enumstr requires a C++20 compiler. CI runs GCC 12, 13, and 14 and Clang 16,
+17, 18, and 21 on Ubuntu, AppleClang on macOS, and MSVC on Windows. It also
+runs the tests under UBSan and ASan.
 
 ## Use as a dependency
 
@@ -99,5 +99,5 @@ FetchContent_MakeAvailable(enumstr)
 target_link_libraries(your_target PRIVATE enumstr::enumstr)
 ```
 
-Or after `cmake --install`, via `find_package(enumstr CONFIG REQUIRED)` and link
+After `cmake --install`, call `find_package(enumstr CONFIG REQUIRED)` and link
 `enumstr::enumstr`.

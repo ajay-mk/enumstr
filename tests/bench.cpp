@@ -1,10 +1,9 @@
-// Timing for to_string_view/from_string. Not a correctness test and not run by
-// ctest -- build it and run it by hand when changing how the scan works.
+// Timing for to_string_view and from_string. It is not a correctness test, and
+// ctest does not run it. Build and run it by hand when you change the scan.
 //
 // Every input goes through a volatile, so the compiler cannot fold a call down
-// to its answer. That matters here: the names themselves are compile-time
-// constants, and without the barrier an optimizing build reports times for code
-// it never emitted.
+// to its answer. The names are compile-time constants, so without the volatile,
+// an optimized build reports times for code it never emitted.
 #include "enumstr.hpp"
 
 #include <chrono>
